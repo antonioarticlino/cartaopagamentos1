@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Controle de Cartão dos Pecados</title>
+  <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      font-family: 'MedievalSharp', cursive;
+      background-color: #1a1a1a;
+      color: #f9f6e5;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 30px;
+      min-height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      border: 3px solid #daa520;
+      box-shadow: 0 0 20px #000;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    h1, h2 {
+      text-align: center;
+      color: #ffd700;
+      text-shadow: 2px 2px #000;
+      margin-top: 80px;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    form input, form select, form button {
+      padding: 12px;
+      flex: 1 1 30%;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 2px solid #444;
+      background: #333;
+      color: #f0e6d2;
+    }
+
+    button {
+      background-color: #6a0dad;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #7e3ff2;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: #1a1a1a;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #555;
+      text-align: center;
+    }
+
+    th {
+      background: #6a0dad;
+      color: white;
+    }
+
+    .excluir-btn, .editar-btn {
+      padding: 6px 10px;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .excluir-btn { background-color: #dc3545; }
+    .excluir-btn:hover { background-color: #c82333; }
+
+    .editar-btn { background-color: #007bff; margin-right: 5px; }
+    .editar-btn:hover { background-color: #0069d9; }
+
+    #filtro-mes, #filtro-nome {
+      margin: 15px 0;
+      padding: 10px;
+      font-size: 14px;
+      background: #444;
+      color: #fff;
+      border: 2px solid #888;
+    }
+
+    ::placeholder {
+      color: #bbb;
+    }
+
+    .logo-brasao {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 100px;
+      z-index: 1;
+    }
+
+    audio {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<audio autoplay loop>
+  <source src="https://files.catbox.moe/4cwrha.mp3" type="audio/mpeg">
+</audio>
+<div class="container">
+  <img src="https://i.imgur.com/GoqOXca.png" alt="Brasão dos Pecados" class="logo-brasao">
+  <h1>🔹 Controle de Cartão dos Pecados</h1>
+
+  <!-- Formulário -->
+  <form id="form-compra">
+    <input type="text" id="usuario" placeholder="Seu nome" required />
+    <input type="text" id="nome" placeholder="Nome do item" required />
+    <input type="text" id="cartao" placeholder="Nome do cartão (ex: MeliodasBank)" required />
+    <input type="number" id="valor" placeholder="Valor total (R$)" step="0.01" required />
+    <input type="number" id="parcelas" placeholder="Parcelas" min="1" required />
+    <input type="date" id="data" required />
+    <button type="submit">Registrar Compra</button>
+  </form>
+
+  <!-- Filtros -->
+  <select id="filtro-mes">
+    <option value="todos">Todas as parcelas</option>
+  </select>
+
+  <select id="filtro-nome">
+    <option value="todos">Todos os usuários</option>
+  </select>
+
+  <!-- Tabela -->
+  <h2>📜 Parcelas Registradas</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Usuário</th>
+        <th>Cartão</th>
+        <th>Item</th>
+        <th>Parcela</th>
+        <th>Valor (R$)</th>
+        <th>Data de Pagamento</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tabela-parcelas"></tbody>
+  </table>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDgvujtdPF9g5BxudH56EEcdduzyulut4E",
+    authDomain: "cartao-de-credito-c83dd.firebaseapp.com",
+    projectId: "cartao-de-credito-c83dd",
+    storageBucket: "cartao-de-credito-c83dd.appspot.com",
+    messagingSenderId: "400599359191",
+    appId: "1:400599359191:web:557a1136fa5e0c1f3fda92",
+    measurementId: "G-G6S784B135"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const form = document.getElementById("form-compra");
+  const tabela = document.getElementById("tabela-parcelas");
+  const filtroMes = document.getElementById("filtro-mes");
+  const filtroNome = document.getElementById("filtro-nome");
+
+  function calcularVencimentosFatura(dataBase, qtdParcelas) {
+    const parcelas = [];
+    let ano = dataBase.getFullYear();
+    let mes = dataBase.getMonth();
+    if (dataBase.getDate() > 26) mes++;
+    for (let i = 0; i < qtdParcelas; i++) {
+      const venc = new Date(ano, mes + i + 1, 2);
+      parcelas.push(venc);
+    }
+    return parcelas;
+  }
+
+  function formatarData(dateStr) {
+    return new Date(dateStr).toLocaleDateString("pt-BR");
+  }
+
+  function getMesAno(dateStr) {
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  async function salvarNoFirebase(parcelas) {
+    const ref = collection(db, "parcelas");
+    for (let p of parcelas) await addDoc(ref, p);
+  }
+
+  async function carregarParcelas() {
+    const ref = collection(db, "parcelas");
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+
+  async function deletarParcela(id) {
+    if (confirm("Deseja excluir esta parcela?")) {
+      await deleteDoc(doc(db, "parcelas", id));
+      atualizarTabela();
+    }
+  }
+
+  function renderizarTabela(parcelas) {
+    tabela.innerHTML = "";
+    const filtro = filtroMes.value;
+    const filtroUsuario = filtroNome.value;
+    const mesesUnicos = new Set();
+    const nomesUnicos = new Set();
+
+    parcelas.sort((a, b) => new Date(a.dataPagamento) - new Date(b.dataPagamento));
+
+    parcelas.forEach(p => {
+      const mesAtual = getMesAno(p.dataPagamento);
+      mesesUnicos.add(mesAtual);
+      nomesUnicos.add(p.usuario);
+      if ((filtro !== "todos" && mesAtual !== filtro) || (filtroUsuario !== "todos" && p.usuario !== filtroUsuario)) return;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.usuario}</td>
+        <td>${p.cartao}</td>
+        <td>${p.nome}</td>
+        <td>${p.numero}/${p.total}</td>
+        <td>R$ ${p.valor.toFixed(2)}</td>
+        <td>${formatarData(p.dataPagamento)}</td>
+        <td>
+          <button class="editar-btn" onclick="editarParcela('${p.id}')">✏️</button>
+          <button class="excluir-btn" onclick="deletarParcela('${p.id}')">🗑️</button>
+        </td>
+      `;
+      tabela.appendChild(tr);
+    });
+
+    filtroMes.innerHTML = '<option value="todos">Todas as parcelas</option>';
+    [...mesesUnicos].sort().forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m;
+      const [y, mo] = m.split("-");
+      opt.textContent = `${mo}/${y}`;
+      filtroMes.appendChild(opt);
+    });
+
+    filtroNome.innerHTML = '<option value="todos">Todos os usuários</option>';
+    [...nomesUnicos].sort().forEach(nome => {
+      const opt = document.createElement("option");
+      opt.value = nome;
+      opt.textContent = nome;
+      filtroNome.appendChild(opt);
+    });
+  }
+
+  async function atualizarTabela() {
+    const todas = await carregarParcelas();
+    renderizarTabela(todas);
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const usuario = document.getElementById("usuario").value;
+    const nome = document.getElementById("nome").value;
+    const cartao = document.getElementById("cartao").value;
+    const valorTotal = parseFloat(document.getElementById("valor").value);
+    const qtdParcelas = parseInt(document.getElementById("parcelas").value);
+    const dataCompra = new Date(document.getElementById("data").value);
+    const valorParcela = valorTotal / qtdParcelas;
+    const idCompra = Date.now().toString();
+    const vencimentos = calcularVencimentosFatura(dataCompra, qtdParcelas);
+
+    const parcelasGeradas = vencimentos.map((venc, i) => ({
+      usuario,
+      nome,
+      cartao,
+      idCompra,
+      numero: i + 1,
+      total: qtdParcelas,
+      valor: valorParcela,
+      dataPagamento: venc.toISOString()
+    }));
+
+    await salvarNoFirebase(parcelasGeradas);
+    form.reset();
+    atualizarTabela();
+  });
+
+  window.deletarParcela = deletarParcela;
+  window.editarParcela = async function(id) {
+    const novaData = prompt("Digite a nova data de pagamento (formato DD/MM/AAAA):");
+    const novoValor = prompt("Digite o novo valor da parcela (R$):");
+    const atualizacoes = {};
+
+    if (novaData) {
+      const partes = novaData.split("/");
+      if (partes.length === 3) {
+        const [dia, mes, ano] = partes.map(Number);
+        const dataObj = new Date(ano, mes - 1, dia);
+        if (!isNaN(dataObj)) {
+          atualizacoes.dataPagamento = dataObj.toISOString();
+        } else {
+          alert("Data inválida!");
+        }
+      }
+    }
+
+    if (novoValor !== null && !isNaN(parseFloat(novoValor))) {
+      atualizacoes.valor = parseFloat(novoValor);
+    }
+
+    if (Object.keys(atualizacoes).length > 0) {
+      await updateDoc(doc(db, "parcelas", id), atualizacoes);
+      atualizarTabela();
+    }
+  };
+
+  filtroMes.addEventListener("change", atualizarTabela);
+  filtroNome.addEventListener("change", atualizarTabela);
+  atualizarTabela();
+</script>
+</body>
+</html>
